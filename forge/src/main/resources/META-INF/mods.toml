@@ -1,0 +1,35 @@
+modLoader = "javafml"
+loaderVersion = "[45,)"
+#issueTrackerURL = ""
+license = "Insert License Here"
+
+[[mods]]
+modId = "qemucraft"
+version = "${version}"
+displayName = "Example Mod"
+authors = "Me!"
+description = '''
+This is an example description! Tell everyone what your mod is about!
+'''
+#logoFile = ""
+
+[[dependencies.qemucraft]]
+modId = "forge"
+mandatory = true
+versionRange = "[45,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.qemucraft]]
+modId = "minecraft"
+mandatory = true
+versionRange = "[1.20.1,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.qemucraft]]
+modId = "architectury"
+mandatory = true
+versionRange = "[8.1.79,)"
+ordering = "AFTER"
+side = "BOTH"
