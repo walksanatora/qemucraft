@@ -1,34 +1,33 @@
+//this was taked from RetroComputers
+
 package net.dblsaiko.retrocomputers.client.gui
 
+import com.mojang.blaze3d.pipeline.RenderTarget
+import com.mojang.blaze3d.pipeline.TextureTarget
 import com.mojang.blaze3d.platform.GlStateManager
 import com.mojang.blaze3d.platform.TextureUtil
 import com.mojang.blaze3d.systems.RenderSystem
+import com.mojang.blaze3d.vertex.DefaultVertexFormat
+import com.mojang.blaze3d.vertex.VertexFormat
 import io.netty.buffer.Unpooled
-import net.dblsaiko.qcommon.croco.Mat4
-import net.dblsaiko.retrocomputers.client.init.Shaders
-import net.dblsaiko.retrocomputers.common.block.TerminalEntity
-import net.dblsaiko.retrocomputers.common.init.Packets
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
-import net.minecraft.client.MinecraftClient
-import net.minecraft.client.gl.Framebuffer
-import net.minecraft.client.gl.SimpleFramebuffer
-import net.minecraft.client.gui.screen.Screen
-import net.minecraft.client.render.BufferRenderer
-import net.minecraft.client.render.VertexFormat.DrawMode
-import net.minecraft.client.render.VertexFormats
-import net.minecraft.client.util.math.MatrixStack
-import net.minecraft.network.PacketByteBuf
-import net.minecraft.text.TranslatableText
-import net.minecraft.util.math.Vec3d
+import com.mojang.blaze3d.vertex.PoseStack
+import dev.architectury.networking.NetworkManager
+import net.minecraft.client.Minecraft
+import net.minecraft.client.gui.GuiGraphics
+import net.minecraft.client.gui.screens.Screen
+import net.minecraft.network.FriendlyByteBuf
+import net.minecraft.network.chat.Component
+import net.minecraft.world.phys.Vec3
+import net.walksanator.qemucraft.QemuCraft
+import net.walksanator.qemucraft.QemuCraftClient
+import net.walksanator.qemucraft.ShaderExpectPlatform
+import net.walksanator.qemucraft.blocks.TerminalEntity
+import net.walksanator.qemucraft.util.math.Mat4
 import org.lwjgl.BufferUtils
 import org.lwjgl.glfw.GLFW
-import org.lwjgl.opengl.GL11
+import org.lwjgl.opengl.*
 import org.lwjgl.opengl.GL11.GL_FLOAT
 import org.lwjgl.opengl.GL11.GL_TRIANGLES
-import org.lwjgl.opengl.GL13
-import org.lwjgl.opengl.GL15
-import org.lwjgl.opengl.GL20
-import org.lwjgl.opengl.GL30
 import kotlin.experimental.xor
 import kotlin.math.round
 
@@ -41,7 +40,7 @@ private val charsetTex = createTexture()
 
 private const val scale = 8
 
-class TerminalScreen(val te: TerminalEntity) : Screen(TranslatableText("block.retrocomputers.terminal")) {
+class TerminalScreen(val te: TerminalEntity) : Screen(Component.translatable("block.qemucraft.terminal")) {
 
     private var uMvp = 0
     private var uCharset = 0
@@ -49,25 +48,29 @@ class TerminalScreen(val te: TerminalEntity) : Screen(TranslatableText("block.re
     private var aXyz = 0
     private var aUv = 0
 
-    private var fb: Framebuffer? = null
+    private var fb: RenderTarget? = null
 
     override fun tick() {
-        val minecraft = client ?: return
-        val dist = minecraft.player?.getCameraPosVec(1f)?.squaredDistanceTo(Vec3d.ofCenter(te.pos))
+        val minecraft = minecraft ?: return
+        val dist = minecraft.player?.getEyePosition(1f)?.distanceToSqr(Vec3.atCenterOf(te.blockPos))
             ?: Double.POSITIVE_INFINITY
         if (dist > 10 * 10) minecraft.setScreen(null)
     }
 
-    override fun render(matrices: MatrixStack, mouseX: Int, mouseY: Int, delta: Float) {
-        renderBackground(matrices)
+    override fun render(guiGraphics: GuiGraphics, i: Int, j: Int, f: Float) {
+        render(guiGraphics.pose(),i,j,f)
+    }
 
-        val sh = Shaders.screen()
+    fun render(matrices: PoseStack, mouseX: Int, mouseY: Int, delta: Float) {
+        //renderBackground(matrices)
+
+        val sh = ShaderExpectPlatform.getShader();
         val fb = fb ?: return
-        val mc = client ?: return
+        val mc = minecraft ?: return
 
-        fb.setTexFilter(if ((mc.window.scaleFactor.toInt() % 2) == 0) GL11.GL_NEAREST else GL11.GL_LINEAR)
+        fb.setFilterMode(if ((mc.window.guiScale.toInt() % 2) == 0) GL11.GL_NEAREST else GL11.GL_LINEAR)
 
-        fb.beginWrite(true)
+        fb.bindWrite(true)
         val mat = Mat4.ortho(0.0f, 1.0f, 1.0f, 0.0f, -1.0f, 1.0f)
 
         GL30.glUseProgram(sh)
@@ -78,7 +81,7 @@ class TerminalScreen(val te: TerminalEntity) : Screen(TranslatableText("block.re
         GL20.glEnableVertexAttribArray(aUv)
 
         RenderSystem.activeTexture(GL13.GL_TEXTURE0)
-        RenderSystem.enableTexture()
+        //RenderSystem.enableTexture()
         RenderSystem.bindTexture(screenTex)
 
         buf.clear()
@@ -101,7 +104,7 @@ class TerminalScreen(val te: TerminalEntity) : Screen(TranslatableText("block.re
         GlStateManager._texImage2D(GL11.GL_TEXTURE_2D, 0, GL30.GL_R16I, 80, 60, 0, GL30.GL_RED_INTEGER, GL11.GL_UNSIGNED_BYTE, buf.asIntBuffer())
 
         RenderSystem.activeTexture(GL13.GL_TEXTURE2)
-        RenderSystem.enableTexture()
+        //RenderSystem.enableTexture()
         RenderSystem.bindTexture(charsetTex)
         GL30.glUniform1i(uCharset, 2)
 
@@ -120,39 +123,39 @@ class TerminalScreen(val te: TerminalEntity) : Screen(TranslatableText("block.re
         GL30.glUseProgram(0)
 
         RenderSystem.bindTexture(0)
-        RenderSystem.disableTexture()
+        //RenderSystem.disableTexture()
         RenderSystem.activeTexture(GL13.GL_TEXTURE0)
         RenderSystem.bindTexture(0)
 
-        mc.framebuffer.beginWrite(true)
+        mc.mainRenderTarget.bindWrite(true)
 
         val swidth = 8 * 80 * 0.5
         val sheight = 8 * 50 * 0.5
         val x1 = round(width / 2.0 - swidth / 2.0)
         val y1 = round(height / 2.0 - sheight / 2.0)
 
-        matrices.push()
+        matrices.pushPose()
         matrices.translate(x1, y1, -2000.0) // why the -2000? not sure
 
-        val shader = mc.gameRenderer.blitScreenShader
-        shader.addSampler("DiffuseSampler", fb.colorAttachment)
-        shader.modelViewMat?.set(matrices.peek().positionMatrix)
-        shader.projectionMat?.set(RenderSystem.getProjectionMatrix())
-        shader.bind()
+        val shader = mc.gameRenderer.blitShader
+        shader.setSampler("DiffuseSampler", fb.colorTextureId)
+        shader.MODEL_VIEW_MATRIX?.set(matrices.last().pose())
+        shader.PROJECTION_MATRIX?.set(RenderSystem.getProjectionMatrix())
+        shader.apply()
 
         val t = RenderSystem.renderThreadTesselator()
-        val buf = t.buffer
-        buf.begin(DrawMode.QUADS, VertexFormats.POSITION_TEXTURE_COLOR)
-        buf.vertex(0.0, 0.0, 0.0).texture(0f, 1f).color(255, 255, 255, 255).next()
-        buf.vertex(0.0, sheight, 0.0).texture(0f, 0f).color(255, 255, 255, 255).next()
-        buf.vertex(swidth, sheight, 0.0).texture(1f, 0f).color(255, 255, 255, 255).next()
-        buf.vertex(swidth, 0.0, 0.0).texture(1f, 1f).color(255, 255, 255, 255).next()
+        val buf = t.builder
+        buf.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR)
+        buf.vertex(0.0, 0.0, 0.0).uv(0f, 1f).color(255, 255, 255, 255).endVertex()
+        buf.vertex(0.0, sheight, 0.0).uv(0f, 0f).color(255, 255, 255, 255).endVertex()
+        buf.vertex(swidth, sheight, 0.0).uv(1f, 0f).color(255, 255, 255, 255).endVertex()
+        buf.vertex(swidth, 0.0, 0.0).uv(1f, 1f).color(255, 255, 255, 255).endVertex()
         buf.end()
-        BufferRenderer.postDraw(buf)
+        //BufferUploader.postDraw(buf)
 
-        shader.unbind()
+        shader.clear()
 
-        matrices.pop()
+        matrices.popPose()
     }
 
     override fun keyPressed(key: Int, scancode: Int, modifiers: Int): Boolean {
@@ -189,21 +192,21 @@ class TerminalScreen(val te: TerminalEntity) : Screen(TranslatableText("block.re
     }
 
     private fun pushKey(c: Byte) {
-        val buffer = PacketByteBuf(Unpooled.buffer())
-        buffer.writeBlockPos(te.pos)
+        val buffer = FriendlyByteBuf(Unpooled.buffer())
+        buffer.writeBlockPos(te.blockPos)
         buffer.writeByte(c.toInt())
-        ClientPlayNetworking.send(Packets.Server.TERMINAL_KEY_TYPED, buffer)
+        NetworkManager.sendToServer(QemuCraft.KEY_PRESS_PACKET, buffer)
     }
 
     override fun init() {
-        client!!.keyboard.setRepeatEvents(true)
+        //minecraft!!.keyboardHandler.setRepeatEvents(true)
 
         initDrawData()
         initFb()
     }
 
     private fun initDrawData() {
-        val sh = Shaders.screen()
+        val sh = ShaderExpectPlatform.getShader()
 
         GL30.glUseProgram(sh)
         GL30.glBindVertexArray(vao)
@@ -241,18 +244,18 @@ class TerminalScreen(val te: TerminalEntity) : Screen(TranslatableText("block.re
     }
 
     private fun initFb() {
-        fb?.delete()
+        fb?.destroyBuffers()
         val scale = 4
-        fb = SimpleFramebuffer(80 * 8 * scale, 50 * 8 * scale, false, MinecraftClient.IS_SYSTEM_MAC)
+        fb = TextureTarget(80 * 8 * scale, 50 * 8 * scale, false, Minecraft.ON_OSX)
     }
 
     override fun removed() {
-        client!!.keyboard.setRepeatEvents(false)
-        fb?.delete()
+        //minecraft!!.keyboardHandler.setRepeatEvents(false)
+        fb?.destroyBuffers()
         fb = null
     }
 
-    override fun shouldPause() = false
+    override fun isPauseScreen() = false
 
 }
 

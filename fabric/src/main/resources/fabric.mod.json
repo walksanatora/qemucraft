@@ -17,6 +17,9 @@
   "entrypoints": {
     "main": [
       "net.walksanator.qemucraft.fabric.QemuCraftFabric"
+    ],
+    "client": [
+      "net.walksanator.qemucraft.fabric.QemuCraftClientFabric"
     ]
   },
   "mixins": [
