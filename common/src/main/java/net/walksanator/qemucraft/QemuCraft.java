@@ -22,6 +22,8 @@ import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.walksanator.qemucraft.blocks.TerminalBlock;
 import net.walksanator.qemucraft.blocks.TerminalEntity;
 
+import java.util.function.Supplier;
+
 public class QemuCraft {
     public static final Resources RESOURCES = new Resources();
     public static final String MOD_ID = "qemucraft";
@@ -32,25 +34,21 @@ public class QemuCraft {
     public static final DeferredRegister<Block> BLOCKS = DeferredRegister.create(MOD_ID,Registries.BLOCK);
     public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITY_TYPES = DeferredRegister.create(MOD_ID,Registries.BLOCK_ENTITY_TYPE);
     public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(MOD_ID, Registries.ITEM);
-
-    public static final RegistrySupplier<Block> TERMINAL_BLOCK = BLOCKS.register(new ResourceLocation(MOD_ID,"terminal_block"),
-            () ->  new TerminalBlock(BlockBehaviour.Properties.of())
-    );
-    public static final RegistrySupplier<BlockEntityType<TerminalEntity>> TERMINAL_BE_TYPE = BLOCK_ENTITY_TYPES.register(new ResourceLocation(MOD_ID,"terminal_blockentity"),
-            () -> BlockEntityType.Builder.of(TerminalEntity::new,TERMINAL_BLOCK.get()).build(null)
-    );
-
     public static final RegistrySupplier<CreativeModeTab> CREATIVE_TAB = CREATIVE_TABS.register(new ResourceLocation(MOD_ID,"example_tab"), () ->
             CreativeTabRegistry.create(Component.translatable("creativeTab.qemu.example_tab"), () ->
                 new ItemStack(QemuCraft.EXAMPLE_ITEM.get()))
     );
 
-    public static final RegistrySupplier<Item> TERMINAL_ITEM = ITEMS.register(new ResourceLocation(MOD_ID,"terminal_block"),
-            () -> new BlockItem(TERMINAL_BLOCK.get(), new Item.Properties().arch$tab(QemuCraft.CREATIVE_TAB))
-    );
     public static final RegistrySupplier<Item> EXAMPLE_ITEM = ITEMS.register("example_item", () ->
             new Item(new Item.Properties().arch$tab(QemuCraft.CREATIVE_TAB)));
-    
+
+    public static final RegistrySupplier<Block> TERMINAL_BLOCK = blockItem("terminal_block",()->new TerminalBlock(BlockBehaviour.Properties.of()),new Item.Properties().arch$tab(CREATIVE_TAB));
+
+    public static final RegistrySupplier<BlockEntityType<TerminalEntity>> TERMINAL_BE_TYPE = BLOCK_ENTITY_TYPES.register(new ResourceLocation(MOD_ID,"terminal_blockentity"),
+            () -> BlockEntityType.Builder.of(TerminalEntity::new,TERMINAL_BLOCK.get()).build(null)
+    );
+
+
     public static void init() {
         ReloadListenerRegistry.register(PackType.CLIENT_RESOURCES,RESOURCES);
         CREATIVE_TABS.register();
@@ -67,6 +65,11 @@ public class QemuCraft {
                 te.pushKey(key);
             });
         });
+    }
 
+    public static <T extends Block> RegistrySupplier<T> blockItem(String name, Supplier<T> block, Item.Properties props) {
+        RegistrySupplier<T> blockRegistered = BLOCKS.register(new ResourceLocation(MOD_ID, name), block);
+        ITEMS.register(new ResourceLocation(MOD_ID, name), () -> new BlockItem(block.get(), props));
+        return blockRegistered;
     }
 }
